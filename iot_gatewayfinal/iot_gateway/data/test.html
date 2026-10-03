@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gateway</title>
+  <link rel="icon" href="assets/icon.png" type="image/png">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- <link rel="stylesheet" href="assets/https://cdn.jsdelivr.net/npm/milligram@1.4.1/dist/milligram.min.css"> -->
+  <link href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.min.css " rel="stylesheet">
+  <!-- <link rel="stylesheet" href="assets//milligram.min.css">
+  <link rel="stylesheet" href="assets//pure-min.css">  -->
+ 
+  <!-- <link rel="stylesheet" href="assets/style.css">  -->
+   <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+  
+    .toolbar {
+      position: sticky;
+      top: 0;
+      /* Sticks to the top of the viewport */
+      background-color: #333;
+      color: white;
+      display: flex;
+      padding: 10px;
+      padding-left: 20;
+      padding-right: 20;
+      justify-content: space-between;
+      align-items: center;
+  
+      z-index: 1000;
+      /* Ensures it appears above other content */
+    }
+  
+    main {
+      padding: 20px;
+      line-height: 1.6;
+    }
+  
+    .tabs-container {
+      max-width: 100%;
+      padding: 10px;
+      margin: 0 auto;
+      /* margin-top: 50px; */
+    }
+    .tab-content {
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+    .pure-menu-item.active a {
+      background-color: #1f8dd6;
+      color: #fff;
+    }
+  
+  /* Customizing default button colors */
+  .pure-button {
+      background-color: #4caf50; /* Green */
+      color: white;
+      border-color: #4caf50;
+    }
+    .pure-button:hover {
+      background-color: #45a049; /* Darker green */
+    }
+  
+    /* Customizing the primary button */
+    .pure-button-primary {
+      background-color: #2196f3; /* Blue */
+      color: white;
+      border-color: #2196f3;
+    }
+    .pure-button-primary:hover {
+      background-color: #1e88e5; /* Darker blue */
+    }
+  
+    /* Customizing links */
+    a {
+      color: #ff5722; /* Orange */
+      text-decoration: none;
+    }
+    a:hover {
+      color: #e64a19; /* Darker orange */
+    }
+  
+    /* Customizing navigation bar (if used) */
+    .pure-menu {
+      background-color: #673ab7; /* Purple */
+    }
+    .pure-menu .pure-menu-link {
+      color: white;
+    }
+    .pure-menu .pure-menu-link:hover {
+      background-color: #5e35b1; /* Darker purple */
+    }
+   </style>
+</head>
+</head>
+
+<body x-data="applicationState()">
+
+  <div class="toolbar">
+    <div style="font-size: 27px; display: inline-flex; color: greenyellow"><span x-text="title"></span> &nbsp; <strong
+        x-text="mac"></strong></div>
+    <div x-text="currentTime" :style="{ color: 'white', display: 'flex' }"></div>
+  </div>
+  <main>
+    <div class="tabs-container" x-data="{ activeTab: 1 }">
+      <!-- Tabs Navigation -->
+      <ul class="pure-menu pure-menu-horizontal">
+        <li class="pure-menu-item" :class="{ 'active': activeTab === 1 }">
+          <a href="#" class="pure-menu-link" @click.prevent="activeTab = 1">Tab 1</a>
+        </li>
+        <li class="pure-menu-item" :class="{ 'active': activeTab === 2 }">
+          <a href="#" class="pure-menu-link" @click.prevent="activeTab = 2">Tab 2</a>
+        </li>
+        <li class="pure-menu-item" :class="{ 'active': activeTab === 3 }">
+          <a href="#" class="pure-menu-link" @click.prevent="activeTab = 3">Tab 3</a>
+        </li>
+      </ul>
+
+      <!-- Tabs Content -->
+      <div class="tab-content" x-show="activeTab === 1" x-transition>
+        <h2>Tab 1 Content</h2>
+        <p>This is the content for Tab 1.</p>
+        
+        <button @click="toggleInterval()">
+          <span x-text="isRunning ? 'Stop Updating' : 'Start Updating'"></span>
+        </button>
+      </div>
+      <div class="tab-content" x-show="activeTab === 2" x-transition>
+        <h2>Tab 2 Content</h2>
+        <p>This is the content for Tab 2.</p>
+        
+        <button @click="getStatus()">Send GET Request</button>
+        <button @click="postData()">Send POST Request</button>
+      </div>
+      <div class="tab-content" x-show="activeTab === 3" x-transition>
+        <h2>Tab 3 Content</h2>
+        <p>This is the content for Tab 3.</p>
+        <p>
+          <input type="text" x-model="message"> &nbsp; <span x-text="message"></span>
+        </p>
+    
+        <button @click="increment()">Increment Counter</button>
+        <p>Counter: <span x-text="counter"></span></p>
+      </div>
+    </div>
+
+
+   
+
+  </main>
+</body>
+
+
+<script>
+  // External JavaScript variable
+  const globalMessage = "This message is from a global JS variable!";
+  // Alpine.js Component Data
+  function applicationState() {
+    return {
+      title: "Gateway",
+      mac: 'XXXXXXX',
+      activeTab: 1,
+      currentTime: new Date().toLocaleString(),
+      isRunning: false,
+      intervalId: null,
+      car: { make: 'Jeep', model: 'Grand Cherokee', color: 'Black' },
+      message: globalMessage, // Use global JavaScript variable
+      counter: 0, // Initialize counter
+      increment() {
+        this.counter++; // Increment counter
+        this.car[this.counter] = "Alto";
+      },
+      getStatus() {
+        fetch(`${ipAddress}/get?value=123`)
+          .then(response => response.text())
+          .then(data => console.log("GET response:", data))
+          .catch(error => console.error("GET Error:", error));
+      },
+      postData() {
+        fetch(`${ipAddress}/post`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded", //"application/json",
+          },
+          body: JSON.stringify({ value: "456" }),
+        })
+          .then(response => response.text())
+          .then(data => console.log("POST response:", data))
+          .catch(error => console.error("POST Error:", error));
+      },
+      startInterval() {
+        this.isRunning = true;
+        this.intervalId = setInterval(() => {
+          this.currentTime = new Date().toLocaleString();
+          /*
+                      fetch('/get')
+                  .then(response => response.json())
+                  .then(data => {
+                    sensorValueElement.textContent = data.sensorValue;
+                  })
+                  .catch(error => console.error('Error:', error));
+          */
+        }, 1000); // Update every second
+      },
+
+      stopInterval() {
+        this.isRunning = false;
+        clearInterval(this.intervalId);
+      },
+
+      toggleInterval() {
+        this.isRunning ? this.stopInterval() : this.startInterval();
+      },
+
+
+      init() {
+        this.startInterval(); // Automatically start on load
+      }
+
+    };
+  }
+</script>
+
+<!-- <script src="/alpine.min.js"></script>  -->
+
+</html>

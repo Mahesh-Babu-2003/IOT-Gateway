@@ -1,0 +1,164 @@
+:root {
+    /* --blue: #1e90ff;
+    --white: #ffffff; */
+    --toolbarOffset: 0px;
+    --sidebarOffset: 160px;
+}
+
+/* Body */
+body {
+    margin: 0;
+    font-size: 0.9rem;
+    font-family: Arial, sans-serif;
+}
+
+* {
+
+    scrollbar-width: thin;
+    /* For Firefox */
+    scrollbar-color: #888 transparent;
+    /* Scrollbar color */
+}
+
+/* WebKit browsers (e.g., Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+    width: 6px;
+    /* Vertical scrollbar width */
+    height: 6px;
+    /* Horizontal scrollbar height */
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #888;
+    /* Scrollbar color */
+    border-radius: 10px;
+    /* Rounded edges */
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #555;
+    /* Darker on hover */
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+    /* Background of the track */
+}
+
+/* Sticky Toolbar */
+.toolbar {
+    top: 0;
+    position: sticky;
+    margin: 0;
+    background-color: #333;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+    /* padding-right: 100px; */
+    z-index: 1000;
+    max-width: 100%;
+}
+
+.toolbar .toolbar-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.toolbar .toolbar-buttons a {
+    margin: 0;
+    padding-left: 1rem;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.toolbar .toolbar-buttons a:hover {
+    color: #e0e0e0;
+    padding-right: 100px
+}
+
+
+/* Sidebar */
+.sidebar {
+    margin: 0;
+    position: fixed;
+    padding-left: 10px;
+    padding-top: var(--toolbarOffset);
+    background-color: #333;
+    color: white;
+    width: var(--sidebarOffset);
+    height: 100vh;
+}
+
+.sidebar a {
+    display: block;
+    color: white;
+    text-decoration: none;
+    margin: 1rem 0;
+}
+
+.sidebar a:hover {
+    color: #1f8dd6;
+}
+
+
+.menu-button {
+    display: none;
+}
+
+/* Layout */
+.layout {
+    margin: 0;
+    padding: 0;
+    padding-left: var(--sidebarOffset);
+    /* display: block; */
+    padding-top: var(--toolbarOffset);
+    /* ; */
+    height: calc(100vh - 49px);
+}
+
+/* Responsive Design for Sidebar */
+@media (max-width: 768px) {
+    .toolbar {
+        margin-left: 0px;
+    }
+
+    .sidebar {
+        position: fixed;
+        transform: translateX(-100%);
+        width: 200px;
+        z-index: 100;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .menu-button {
+        display: inline;
+    }
+
+    /* Layout */
+    .layout {
+        padding-left: 10px;
+    }
+
+}
+
+
+
+/* Container for the scrollable table */
+.scrollable-container {
+    max-height: 300px;
+    /* Adjust height as needed */
+    overflow-y: auto;
+    border: 1px solid #ccc;
+}
+
+/* Ensure the table fits within the container */
+.scrollable-container table {
+    width: 100%;
+    border-collapse: collapse;
+}

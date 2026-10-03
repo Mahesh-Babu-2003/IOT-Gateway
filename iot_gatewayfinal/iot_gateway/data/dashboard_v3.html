@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus Devices</title> 
+    <link href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.min.css " rel="stylesheet">
+    <link rel="stylesheet" href="assets/pure-min.css" /> 
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/pages.css">
+    <!-- <link rel="stylesheet" href="fonts/fontawesome.min.css"> -->
+</head>
+
+<body x-data="applicationState()">
+    <h1>Dashboard &nbsp;
+        <button @click="reload()" title="Edit" class="action-btn"> 
+            <object id="svg-object" data="fonts/refresh.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+        </button>
+    </h1>
+
+    <div style="max-width: 100%;width: fit-content; padding-bottom: 30px;" class="scrollable-container">
+        <table class="pure-table">
+            <thead>
+                <tr>
+                    <th>AI 1 ADC</th>
+                    <th>AI 1 Value</th>
+                    <th>AI 2 ADC</th>
+                    <th>AI 2 Value</th>
+                    <th>Relay Status</th>
+                </tr>
+            </thead>
+            <tbody> 
+                <tr>
+                    <td><span x-text="AI_1_HW"></span></span> </td>
+                    <td><span x-text="AI_1_VALUE"></span></span> </td> 
+                    <td><span x-text="AI_2_HW"></span></span> </td> 
+                    <td><span x-text="AI_2_VALUE"></span></span> </td> 
+                    <td><span x-text="relayStatus[DO_1_VALUE]"></span></span> </td> 
+                </tr>
+             </tbody>
+        </table> 
+    </div>
+
+    
+    <div style="max-width: 100%;width: fit-content; margin-bottom: 30px;" class="scrollable-container" x-show="gatewayMode == 1">
+        
+        <h2>Modbus Devices</h2>
+
+        <table class="pure-table">
+            <thead>
+                <tr>
+                    <th>Gateway Mode</th>
+                    <th>Gateway Port</th>
+                    <th>Baudrate</th>
+                    <th>Parity</th>
+                </tr>
+            </thead>
+            <tbody> 
+                <tr>
+                    <td><span x-text="modes[gatewayMode]"></span></span> </td>
+                    <td><span x-text="port"></span></span> </td>
+                    <td><span x-text="baudrate"></span></span> </td>
+                    <td><span x-text="parityType[parity]"></span></span> </td>
+                </tr>
+             </tbody>
+        </table> 
+    </div>
+    <div style="max-width: 100%;width: fit-content;margin-bottom: 30px;" class="scrollable-container" x-show="gatewayMode == 0">
+        <h2>Modbus Devices</h2>
+        <table class="pure-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Device ID</th>
+                    <th>Name</th>
+                    <th>Address</th>
+                    <th>Baudrate</th>
+                    <th>Parity</th>
+                    <th>Register Size</th>
+                    <th>Time out</th>
+                    <th>Device Inter Gap</th>
+                    <th>Register Inter Gap</th>
+                    <th>Server Sync Period</th>
+                    <th>Read</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(device, index) in modbus_devices">
+                    <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                        <td><span x-text="index + 1"></span></span> </td>
+                        <td><span x-text="device.id"></span></span></td>
+                        <td><span x-text="device.name"></span></span></td>
+                        <td><span x-text="device.address"></span></span></td>
+                        <td><span x-text="device.baudrate"></span> </td>
+                        <td><span x-text="parityType[device.parity]"></span> </td>
+                        <td><span x-text="device.regByteCount"></span> </td>
+                        <td><span x-text="device.timeOut"></span> </td>
+                        <td><span x-text="device.deviceDelay"></span> </td>
+                        <td><span x-text="device.registerDelay"></span> </td>
+                        <td><span x-text="device.syncPeriod"></span> </td>
+                        <td><span x-text="device.blockRead?'Block':'Individual'"></span> </td>
+                        <td x-bind:style="{ backgroundColor: device.connected ? 'green' : 'red', padding: '1px' }">
+                            <!-- Action buttons --> 
+                            <button @click="liveDevice(device, 'modbus')" title="Edit" class="action-btn">
+                                <object data="fonts/eye.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <div style="max-width: 100%;width: fit-content" class="scrollable-container" >
+        <h2>Snmp Devices</h2>
+        <table class="pure-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Device ID</th>
+                    <th>Name</th>
+                    <th>Address</th>
+                    <th>Port</th>
+                    <th>Read Community</th>
+                    <th>Write Community</th>
+                    <th>Version</th> 
+                    <th>Device Delay</th> 
+                    <th>Sync Period</th> 
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(device, index) in snmp_devices">
+                    <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                        <td><span x-text="index + 1"></span></span> </td>
+                        <td><span x-text="device.id"></span></span></td>
+                        <td><span x-text="device.name"></span></span></td>
+                        <td><span x-text="device.address"></span></span></td>
+                        <td><span x-text="device.port"></span> </td> 
+                        <td><span x-text="device.readCommunity"></span> </td>
+                        <td><span x-text="device.writeCommunity"></span> </td>
+                        <td><span x-text="device.snmpVersion"></span> </td>
+                        <td><span x-text="device.deviceDelay"></span> </td>
+                        <td><span x-text="device.syncPeriod"></span> </td>
+                        <td x-bind:style="{ backgroundColor: device.connected ? 'green' : 'red', padding: '1px' }">
+                            <!-- Action buttons --> 
+                            <button @click="liveDevice(device, 'snmp')" title="Edit" class="action-btn">
+                                <object data="fonts/eye.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal Dialog -->
+    <div x-show="gatewayMode == 0 && isModalOpen && currentDevice != undefined && registers" 
+    class="modal" style="display: none;" @click="closeModal()"  
+    x-transition>
+        <div  class="modal-container" @click.stop>
+            <h2  x-text="currentDevice?.name"> </h2>
+
+            <div style="max-width: 100%;width: fit-content" class="scrollable-container">
+                <table class="pure-table">
+                    <thead>
+                        <th>#</th>
+                        <th>Parameter ID</th>
+                        <th>Name</th>
+                        <th>Value</th>
+                    </thead>
+                    <tbody>
+                        <template x-for="(register, index) in registers">
+                            <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                                <td><span x-text="index + 1"></span></span> </td>
+                                <td><span x-text="register.id"></span></span></td>
+                                <td><span x-text="register.name"></span></span></td>
+                                <td><span x-text="register.value"></span></span></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+             
+        </div>
+    </div>
+
+</body>
+
+
+    <script>
+        function applicationState() {
+            return {
+                parityType: ["None", "Even", "Odd"],
+                
+                relayStatus: ["Off", "On"],
+                modes: ["Local", "Transparent"],
+                gatewayMode: 0,
+                baudrate: 9600,
+                parity: 0,
+                port: 80,
+
+                isModalOpen: false,
+                currentDevice: null,
+                currentDeviceType: null,
+                isRunning: false,
+                intervalId: null,
+                modbus_devices: [ ],
+                snmp_devices: [ ],
+                registers: [ ],
+
+                AI_1_HW: '',
+                AI_2_HW: '',
+                AI_1_VALUE: '',
+                AI_2_VALUE: '',
+                DO_1_VALUE: '',
+
+                startInterval() {
+                    this.isRunning = true;
+                    this.intervalId = setInterval(() => {
+                        this.fetchCurrentDeviceInfo();
+                    }, 3000); // Update every second
+                },
+                stopInterval() {
+                    this.isRunning = false;
+                    try{
+                        clearInterval(this.intervalId);
+                    }catch(err){    
+                    }
+                },
+                liveDevice(device, deviceType) {
+                    this.stopInterval();
+                    this.registers = [];
+                    this.currentDevice = device;
+                    this.currentDeviceType = deviceType;
+                    this.isModalOpen = this.currentDevice != undefined;                    
+                    this.fetchCurrentDeviceInfo();
+                    this.startInterval();
+                }, 
+                saveData() {
+                    console.log("Network data saved:", data);
+                    alert("Network settings saved successfully!");
+                },
+                closeModal() {
+                    this.isModalOpen = false;
+                    this.stopInterval();
+                    this.currentDevice = null;
+                    this.registers = [ ];
+                },
+                fetchDevices(deviceType){
+                    fetch(`/${deviceType}_devices`)
+                    .then((response) => response.json())
+                    .then((devices) => {
+                        if(deviceType == 'modbus'){ 
+                            this.modbus_devices = devices;
+                        }else{
+                            this.snmp_devices = devices;
+                        } 
+                    })
+                    .catch((error) => console.error("Error:", error));
+                },
+                fetchCurrentDeviceInfo(){
+                    console.log('this.currentDevice', this.currentDevice)
+                    if(this.currentDevice){
+                        fetch(`/live_${this.currentDeviceType}_device?id=${this.currentDevice.id}`)
+                        .then((response) => response.json())
+                        .then((registers) => {
+                            this.registers = registers; 
+                        })
+                        .catch((error) => console.error("Error:", error));
+                    }
+                },
+                loadConfiguration(){
+                    fetch("/configuration")
+                    .then((response) => response.json())
+                    .then((data) => {
+                      this.gatewayMode = data.gatewayMode;
+                      this.baudrate = data.baudrate;
+                      this.parity = data.parity;
+                      this.port = data.port;                       
+                        this.AI_1_HW = data.AI_1_HW;
+                        this.AI_2_HW = data.AI_2_HW;
+                        this.AI_1_VALUE = data.AI_1_VALUE;
+                        this.AI_2_VALUE = data.AI_2_VALUE;
+                        this.DO_1_VALUE = data.DO_1_VALUE;
+                    })
+                    .catch((error) => console.error("Error:" + error.message));
+                },
+                reload(){
+                    this.loadConfiguration();
+                    this.fetchDevices('modbus');
+                    this.fetchDevices('snmp'); 
+                },
+                init(){
+                    this.reload();
+                }
+            }
+        }
+    </script>
+    <script src="assets/alpine.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</html>

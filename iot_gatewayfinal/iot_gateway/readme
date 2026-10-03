@@ -1,0 +1,29 @@
+Install the PlatformIO File System Uploader
+    If you haven't already, install the filesystem uploader tool:
+    pio pkg install -g --tool platformio/tool-esptoolpy
+4. Upload Files to SPIFFS
+    Run the following command to upload your files to SPIFFS:
+    pio run --target uploadfs
+
+    pio run 
+    pio run --target clean
+    pio run --target erase
+    pio run --target uploadfs
+    pio run --target upload
+    pio device monitor
+
+
+Debug levels:
+    0 (CORE_DEBUG_LEVEL=0): Disable all debugging logs.
+    1 (CORE_DEBUG_LEVEL=1): Error logs only.
+    2 (CORE_DEBUG_LEVEL=2): Warnings.
+    3 (CORE_DEBUG_LEVEL=3): Information logs.
+    4 (CORE_DEBUG_LEVEL=4): Debug-level logs.
+    
+
+
+    
+
+    pio run --target erase
+    pio run --target uploadfs
+    pio run --target upload

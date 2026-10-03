@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gateway</title>
+  <link rel="icon" href="assets/icon.png" type="image/png"> 
+ 
+  
+  <link rel="stylesheet" href="assets/pure-min.css" /> 
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/pages.css">
+  <!-- <link rel="stylesheet" href="fonts/fontawesome.min.css"> -->
+</head>
+
+<body x-data="applicationState()"> 
+</body>
+
+<script>
+    function applicationState() {
+        return {
+            title: "Network",
+            counter: 0, // Initialize counter, 
+            currentTime: new Date().toLocaleString(),
+            isRunning: false,
+            intervalId: null,  
+            increment() {
+                this.counter++; // Increment counter
+                this.car[this.counter] = "Alto";
+            },
+            startInterval() {
+                this.isRunning = true;
+                this.intervalId = setInterval(() => {
+                    this.currentTime = new Date().toLocaleString();
+                    /*
+                                fetch('/get')
+                            .then(response => response.json())
+                            .then(data => {
+                              sensorValueElement.textContent = data.sensorValue;
+                            })
+                            .catch(error => console.error('Error:', error));
+                    */
+                }, 1000); // Update every second
+            },
+            stopInterval() {
+                this.isRunning = false;
+                clearInterval(this.intervalId);
+            },
+
+            toggleInterval() {
+                this.isRunning ? this.stopInterval() : this.startInterval();
+            }, 
+            init() {
+                this.startInterval(); // Automatically start on load
+            }, 
+        };
+    } 
+    
+</script>
+<script src="assets/alpine.min.js"></script>  
+</html>

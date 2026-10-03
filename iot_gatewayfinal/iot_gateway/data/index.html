@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gateway</title>
+    <link rel="icon" href="assets/icon.png" type="image/png" />
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/milligram@1.4.1/dist/milligram.min.css"> --> 
+    <!-- <link rel="stylesheet" href="/milligram.min.css"> -->
+     
+    <link href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.min.css " rel="stylesheet">
+    <link rel="stylesheet" href="assets/pure-min.css" />
+    <link rel="stylesheet" href="assets/style.css">
+    <!-- <link rel="stylesheet" href="assets/pages.css"> -->
+    <!-- <link rel="stylesheet" href="fonts/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="fonts/boxicons.min.css"> -->
+    <!-- <link rel="stylesheet" type="text/css" href="style.css?v=12345678" /> -->
+    <style>
+      .network-info {
+        display: block;
+        font-weight: bold;
+        color: aqua;
+      }
+      .title-info {
+        display: block;
+        font-weight: bold;
+        color: greenyellow;
+      }
+    </style>
+  </head>
+
+  <body x-data="applicationState()">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-title">
+        <div class="toolbar-buttons">
+          <a href="#" class="menu-button" id="toggleSidebar">☰ &nbsp;</a>
+
+          <strong x-text="hostname"></strong> - <strong x-text="mac"></strong>
+        </div>
+      </div>
+      <div
+        x-text="currentTime"
+        :style="{ color: 'white', display: 'flex' }"
+      ></div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+      <a href="#home"  @click.prevent="loadIframe('dashboard_v3.html'); return false;">
+        <i class="fa fa-home" > &nbsp;Dashboard</i>  </a
+      >
+      <a href="#Devices" @click.prevent="loadIframe('devices_v5.html'); return false;"
+        > 
+         <i class="fa fa-sitemap" > &nbsp;Configuration</i></a
+      >
+      <a href="#network" @click.prevent="loadIframe('network_v3.html'); return false;"
+        > <i class="fa fa-wifi" >&nbsp;Network</i></a
+      >
+      <!-- <a
+        href="#Maintainance"
+        @click.prevent="loadIframe('network.html'); return false;"
+        >Settings</a
+      >
+      <a href="#about" @click.prevent="loadIframe('about.html'); return false;"
+        >About</a
+      >
+      <a href="#contact" @click.prevent="loadIframe('contact.html'); return false;"
+        >Contact</a
+      > -->
+
+      <div  style="position: fixed; bottom: 20px;"> 
+        <div style="padding-top: 10px" x-show="wifiConnected">
+          <span>Network:</span>
+          <span x-text="ipAddress" class="network-info"> </span>
+          <span x-text="subnetMask" class="network-info"> </span>
+          <span x-text="gateway" class="network-info"> </span>
+          <span x-text="macAddress" class="network-info"> </span>
+        </div> 
+        
+        <div style="padding-top: 10px" x-show="brokerConnected">
+          <span>Mqtt 1:</span>
+          <span x-text="mqttServer" class="network-info"> </span>
+          <span x-text="mqttPort" class="network-info"> </span>
+        </div>
+        
+        <div style="padding-top: 10px" x-show="brokerConnected_2">
+          <span>Mqtt 2:</span>
+          <span x-text="mqttServer_2" class="network-info"> </span>
+          <span x-text="mqttPort_2" class="network-info"> </span>
+        </div>
+
+      <span  style="padding-top: 20px"  class="title-info" > Powern Solutions </span>
+    </div>
+  </div>
+
+    <!-- Layout -->
+     
+    <!-- style="width: 100%; min-height: calc(100vh - 50px); border: none" -->
+    <div class="layout">
+      <iframe
+        id="iframe-content"
+        name="iframe-content"
+        src="dashboard_v3.html"
+        style="width: 100%; min-height:100%; border: none"
+      ></iframe>
+    </div>
+  </body>
+
+  <script>
+    document
+      .getElementById("toggleSidebar")
+      .addEventListener("click", function (e) {
+        e.preventDefault();
+        const sidebar = document.getElementById("sidebar");
+        sidebar.classList.toggle("open");
+      });
+ 
+  </script>
+
+  <script>
+    function applicationState() {
+      let ipAddress = document.location.origin;
+      return {
+        mac: "",
+        currentTime: new Date().toLocaleString(),
+        isRunning: false,
+        intervalId: null,
+
+        brokerConnected: true,
+        mqttServer:"",
+        mqttPort:"",
+        
+        brokerConnected_2: true,
+        mqttServer_2:"",
+        mqttPort_2:"",
+
+        wifiConnected: true,
+        hostname: "",
+        ssid: "",
+        macAddress: "",
+        ipAddress: "",
+        subnetMask: "",
+        gateway: "",
+
+        increment() {
+          this.counter++; // Increment counter
+          this.car[this.counter] = "Alto";
+        },
+        startInterval() {
+          this.isRunning = true;
+          this.intervalId = setInterval(() => {
+            this.currentTime = new Date().toLocaleString();
+          }, 1000); // Update every second
+        },
+        stopInterval() {
+          this.isRunning = false;
+          clearInterval(this.intervalId);
+        },
+        loadIframe(pageUrl) {
+          const iframe = document.getElementById("iframe-content");
+          iframe.src = pageUrl;
+        },
+        toggleInterval() {
+          this.isRunning ? this.stopInterval() : this.startInterval();
+        },
+        fetchInformation() {
+          fetch("/information")
+            .then((response) => response.json())
+            .then((data) => {
+              this.ipAddress = data.ipAddress;
+              this.subnetMask = data.subnetMask;
+              this.gateway = data.gateway;
+              this.macAddress = data.macAddress;
+              this.wifiConnected = data.wifiConnected;
+              this.hostname = data.hostname;
+              this.mac = data.mac;
+
+              this.brokerConnected = data.brokerConnected;
+              this.mqttServer = data.mqttServer;
+              this.mqttPort = data.mqttPort;
+              
+
+              this.brokerConnected_2 = data.brokerConnected_2;
+              this.mqttServer_2 = data.mqttServer_2;
+              this.mqttPort_2 = data.mqttPort_2;
+            })
+            .catch((error) => console.error("Error:", error));
+        },
+        init() {
+          this.startInterval(); // Automatically start on load
+          this.fetchInformation();
+        },
+      };
+    }
+  </script> 
+  <script src="assets/alpine.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</html>

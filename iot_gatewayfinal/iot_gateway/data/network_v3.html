@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Network Interfaces</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.min.css " rel="stylesheet">
+    <link rel="stylesheet" href="assets/pure-min.css" />
+    <link rel="stylesheet" href="assets/style.css" />
+    <link rel="stylesheet" href="assets/pages.css" />
+    <!-- <link rel="stylesheet" href="fonts/fontawesome.min.css" /> -->
+    <style>      
+    .pure-form input,
+    .pure-form select {
+        width: 100%;
+        padding: 1px;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 2px;
+        margin-bottom: 2px;
+    }
+
+    .pure-form input[type="checkbox"] {
+        width: auto;
+        margin-right: 2px;
+    }
+
+    .pure-button {
+        width: 100%;
+        background-color: #007bff;
+        color: #ffffff;
+        font-size: 1rem;
+        text-align: center;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 2px;
+    } 
+    </style>
+  </head>
+
+  <body>
+    <div class="modal-container" x-data="networkConfig()">
+      <h1>Network Interfaces</h1>
+      <form @submit.prevent="saveData" class="pure-form pure-form-stacked">
+        <div class="flex-container">
+          <!-- Hostname and MAC Address -->
+          <div class="flex-item">
+            <label for="hostname">Hostname *</label>
+            <input type="text" id="hostname" x-model="hostname" required />
+          </div>
+          <div class="flex-item">
+            <label for="adminPassword">Admin Password *</label>
+            <div style="display: block">
+              <input
+                :type="showAdminPassword ? 'text' : 'password'"
+                style="display: inline; max-width: 75%"
+                id="adminPassword"
+                x-model="adminPassword"
+                required
+              />
+              <button
+                type="button"
+                @click="showAdminPassword = !showAdminPassword"
+                style="
+                  display: inline;
+                  border: none;
+                  background: none;
+                  cursor: pointer;
+                "
+              >
+                <span x-text="showAdminPassword ? '🙈' : '👁️'"></span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="flex-container">
+          <div class="flex-item">
+            <label for="ssid">SSID *</label>
+            <input type="text" id="ssid" x-model="ssid" required />
+          </div>
+          <div class="flex-item">
+            <label for="password">Password *</label>
+            <div style="display: block">
+              <input
+                :type="showPassword ? 'text' : 'password'"
+                style="display: inline; max-width: 75%"
+                id="password"
+                x-model="password"
+                required
+              />
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                style="
+                  display: inline;
+                  border: none;
+                  background: none;
+                  cursor: pointer;
+                "
+              >
+                <span x-text="showPassword ? '🙈' : '👁️'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-container">
+          <div class="flex-item">
+            <label>
+              <input
+                type="checkbox"
+                id="static"
+                x-model="staticEnabled"
+                style="margin: 0; margin-right: 5px"
+              />
+              <span>Static </span>
+            </label>
+          </div>
+        </div>
+        <template x-if="staticEnabled">
+          <span>
+            <div class="flex-container">
+              <div class="flex-item">
+                <label for="staticIp">IP Address *</label>
+                <input type="text" id="staticIp" x-model="staticIp" required />
+              </div>
+              <div class="flex-item">
+                <label for="staticSubnet">Subnetmask *</label>
+                <input
+                  type="text"
+                  id="staticSubnet"
+                  x-model="staticSubnet"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="flex-container">
+              <div class="flex-item">
+                <label for="staticGateway">Gateway *</label>
+                <input
+                  type="text"
+                  id="staticGateway"
+                  x-model="staticGateway"
+                  required
+                />
+              </div>
+              
+              <div class="flex-item"></div>
+            </div>
+          </span>
+        </template>
+
+        <div class="flex-container" style="padding-top: 30px">
+          <div class="flex-item">
+            <label for="mqttServer">MQTT 1 Broker Address *</label>
+            <input type="text" id="mqttServer" x-model="mqttServer" required />
+          </div>
+          <div class="flex-item">
+            <label for="mqttPort">MQTT 1 Broker Port *</label>
+            <input type="number" id="mqttPort" x-model="mqttPort" required />
+          </div>
+        </div>
+
+        <div class="flex-container" style="padding-top: 30px">
+          <div class="flex-item">
+            <label for="mqttUsername">MQTT 1 Username </label>
+            <input type="text" id="mqttUsername" x-model="mqttUsername" />
+          </div>
+          <div class="flex-item">
+            <label for="mqttPassword">MQTT 1 Broker Password </label>
+            <input type="text" id="mqttPassword" x-model="mqttPassword" />
+          </div>
+        </div>
+
+        
+        <div class="flex-container" style="padding-top: 30px">
+          <div class="flex-item">
+            <label for="mqttServer_2">MQTT 2 Broker Address</label>
+            <input type="text" id="mqttServer_2" x-model="mqttServer_2"  />
+          </div>
+          <div class="flex-item">
+            <label for="mqttPort_2">MQTT 2 Broker Port</label>
+            <input type="number" id="mqttPort_2" x-model="mqttPort_2"  />
+          </div>
+        </div>
+        
+        <div class="flex-container" style="padding-top: 30px">
+          <div class="flex-item">
+            <label for="mqttUsername_2">MQTT 2 Username </label>
+            <input type="text" id="mqttUsername_2" x-model="mqttUsername_2" />
+          </div>
+          <div class="flex-item">
+            <label for="mqttPassword_2">MQTT 2 Broker Password </label>
+            <input type="text" id="mqttPassword_2" x-model="mqttPassword_2" />
+          </div>
+        </div>
+
+        <div class="flex-container">
+          <button type="submit" class="flex-item pure-button">Save Configuration</button>
+          <!-- <button
+            type="button"
+            @click="testConnection"
+            class="flex-item pure-button cancel-btn"
+          >
+            Test Internet Connection
+          </button> -->
+        </div>
+        <div x-show="errorMsg" class="error-msg">
+          Please fill in all required fields correctly.
+        </div>
+      </form>
+    </div>
+  </body>
+
+  <script>
+    function networkConfig() {
+      return {
+        hostname: "",
+        ssid: "",
+        password: "",
+        adminPassword: "",
+        showPassword: false,
+        showAdminPassword: false,
+
+        mqttPort: 1883,
+        mqttServer: "",
+        mqttUsername: "",
+        mqttPassword: "",
+
+        mqttPort_2: 1883,
+        mqttServer_2: "",
+        mqttUsername_2: "",
+        mqttPassword_2: "",
+        
+        staticEnabled: false,
+        staticIp: "",
+        staticSubnet: "",
+        staticGateway: "",
+        errorMsg: false,
+        saveData() {
+          if (!this.hostname || !this.ssid || !this.password || !this.adminPassword) {
+            this.errorMsg = true;
+            return;
+          }
+          this.errorMsg = false;
+          const data = {
+            hostname: this.hostname,
+            ssid: this.ssid,
+            password: this.password,
+            adminPassword:this.adminPassword,
+
+            mqttServer: this.mqttServer,
+            mqttPort: this.mqttPort,
+            mqttUsername:this.mqttUsername,
+            mqttPassword:this.mqttPassword,
+
+            mqttServer_2: this.mqttServer_2,
+            mqttPort_2: this.mqttPort_2,
+            mqttUsername_2:this.mqttUsername_2,
+            mqttPassword_2:this.mqttPassword_2,
+
+            staticEnabled: this.staticEnabled?1:0,
+            staticIp: this.staticIp,
+            staticSubnet: this.staticSubnet,
+            staticGateway: this.staticGateway,
+            devices: {},
+          };
+
+          console.log("Network data saved:", data);
+
+          fetch("/wifi_setup", {
+            method: "POST", // HTTP method
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: JSON.stringify(data), // Send data as URL-encoded
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              return response.json(); // Parse JSON response
+            })
+            .then((data) => {
+              alert("Network settings saved successfully!");
+              this.fetchInformation();
+            })
+            .catch((error) => {
+              alert("Network settings failed to save!");
+              console.error("Error:", error); // Handle errors
+            });
+        },
+
+        fetchInformation() {
+          fetch("/wifi_setup")
+            .then((response) => response.json())
+            .then((data) => {
+              this.ssid = data.ssid;
+              this.password = data.password;
+              this.adminPassword = data.adminPassword;
+              this.hostname = data.hostname;
+
+              this.mqttServer = data.mqttServer;
+              this.mqttPort = data.mqttPort;
+              this.mqttUsername = data.mqttUsername;
+              this.mqttPassword = data.mqttPassword;
+              
+              this.mqttServer_2 = data.mqttServer_2;
+              this.mqttPort_2 = data.mqttPort_2;
+              this.mqttUsername_2 = data.mqttUsername_2;
+              this.mqttPassword_2 = data.mqttPassword_2;
+
+              this.staticEnabled = data.staticEnabled == 1;
+              this.staticIp = data.staticIp;
+              this.staticSubnet = data.staticSubnet;
+              this.staticGateway = data.staticGateway; 
+            })
+            .catch((error) => alert("Error:" +  error.message));
+        },
+        init() {
+          this.fetchInformation();
+        },
+        testConnection() {
+          alert("Testing internet connection...");
+        },
+      };
+    }
+  </script>
+  <script src="assets/alpine.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</html>

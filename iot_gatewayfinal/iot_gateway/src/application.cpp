@@ -1,0 +1,638 @@
+#include "application.h"
+#include <esp_task_wdt.h>
+// Address - 10, 9600, 8N1
+// Modbus modbus(Serial1);
+String MB_DEVICES_CONFIGURATION_BIN = "/DEVICES_FILE";
+String BKUP_MB_DEVICES_CONFIGURATION_BIN = "/BKUP_DEVICES_FILE";
+String LOG_CONFIGURATION_FILE = "/LOG_FILE";
+
+#define DEFAULT_NUMBER_OF_MB_DEVICES 1
+#define DEFAULT_SYNC_PERIOD 30
+
+SemaphoreHandle_t deviceMutex = xSemaphoreCreateMutex();
+SemaphoreHandle_t snmpMutex = xSemaphoreCreateMutex();
+
+// R"rawliteral()rawliteral"
+String devicesJson = "["
+                     "{'id': 1, 'address': 10, 'name': 'Energy meter 1', 'baudrate': 9600, 'parity': 0, 'regByteCount': 2, 'timeOut': 500, 'deviceDelay': 500, 'registerDelay': 20, syncPeriod: 10000,"
+                     "'registers': [{\"id\": 1, \"name\": \"Voltage 1\", \"address\": 0, \"regType\": 3, \"byteOrder\": 2, \"factor\": 1, \"dataType\": 10, \"value\": 0},"
+                     "{\"id\": 2, \"name\": \"Voltage 2\", \"address\": 2, \"regType\": 3, \"byteOrder\": 2, \"factor\": 1, \"dataType\": 10, \"value\": 0},"
+                     "{\"id\": 3, \"name\": \"Voltage 3\", \"address\": 4, \"regType\": 3, \"byteOrder\": 2, \"factor\": 1, \"dataType\": 10, \"value\": 0},"
+                     "{\"id\": 4, \"name\": \"Current 1\", \"address\": 12, \"regType\": 3, \"byteOrder\": 2, \"factor\": 1, \"dataType\": 10, \"value\": 0},"
+                     "{\"id\": 5, \"name\": \"Current 2\", \"address\": 14, \"regType\": 3, \"byteOrder\": 2, \"factor\": 1, \"dataType\": 10, \"value\": 0},"
+                     "{\"id\": 6, \"name\": \"Current 3\", \"address\": 16, \"regType\": 3, \"byteOrder\": 2, \"factor\": 1, \"dataType\": 10, \"value\": 0}]"
+                     "}"
+                     "]";
+
+const char *appSettings = "appSettings";
+
+const char *GATEWAY_MODE_KEY = "GATEWAY_MODE_KEY";
+const char *BAUDRATE_KEY = "BAUDRATE_KEY";
+const char *DATA_BITS_KEY = "DATA_BITS_KEY";
+const char *STOP_BITS_KEY = "STOP_BITS_KEY";
+const char *PARITY_KEY = "PARITY_KEY";
+const char *SERVER_PORT_KEY = "SERVER_PORT_KEY";
+
+void saveApplicationSettings()
+{
+    String appString;
+    JsonDocument appDoc;
+    Serial.println((String) "Saving Application settings..." + liveObj.gatewayMode + ", " + liveObj.baud_rate + ", " + liveObj.data_bits + ", " + liveObj.stop_bits + ", " + liveObj.parity + ", " + liveObj.serverPort);
+
+    appDoc[GATEWAY_MODE_KEY] = liveObj.gatewayMode;
+    appDoc[BAUDRATE_KEY] = liveObj.baud_rate;
+    appDoc[DATA_BITS_KEY] = liveObj.data_bits;
+    appDoc[STOP_BITS_KEY] = liveObj.stop_bits;
+    appDoc[PARITY_KEY] = liveObj.parity;
+    appDoc[SERVER_PORT_KEY] = liveObj.serverPort;
+
+    serializeJson(appDoc, appString);
+
+    preferences.begin(appSettings, false);
+    preferences.putString(appSettings, appString);
+    preferences.end();
+}
+
+void loadApplicationSettings()
+{
+
+    preferences.begin(appSettings, false);
+    bool isRestored = false;
+    Serial.println("Load Application Settings...");
+
+    if (preferences.isKey(appSettings))
+    {
+        String appString = preferences.getString(appSettings);
+        JsonDocument appDoc;
+        DeserializationError error = deserializeJson(appDoc, appString.c_str());
+        if (!error)
+        {
+            liveObj.gatewayMode = appDoc[GATEWAY_MODE_KEY].as<int32_t>();
+            liveObj.baud_rate = appDoc[BAUDRATE_KEY].as<int32_t>();
+            liveObj.data_bits = appDoc[DATA_BITS_KEY].as<int32_t>();
+            liveObj.parity = appDoc[PARITY_KEY].as<int32_t>();
+            liveObj.stop_bits = appDoc[STOP_BITS_KEY].as<int32_t>();
+            liveObj.serverPort = appDoc[SERVER_PORT_KEY].as<int32_t>();
+            isRestored = true;
+        }
+    }
+
+    if (isRestored == false)
+    {
+        liveObj.gatewayMode = LOCAL_MODE;
+        liveObj.baud_rate = 9600;
+        liveObj.data_bits = 8;
+        liveObj.parity = NONE_PARITY;
+        liveObj.stop_bits = 1;
+        liveObj.serverPort = 8080;
+    }
+
+    // Close Preferences
+    preferences.end();
+}
+
+uint8_t saveModbusDevicesConfiguration()
+{
+    uint8_t success = false;
+
+    // delay(100);
+    // server.end();
+    esp_task_wdt_reset(); // Enable panic on timeout
+    deleteFile(SPIFFS, BKUP_MB_DEVICES_CONFIGURATION_BIN.c_str());
+    renameFile(SPIFFS, MB_DEVICES_CONFIGURATION_BIN.c_str(), BKUP_MB_DEVICES_CONFIGURATION_BIN.c_str());
+
+    uint32_t savedByteCount = 0, attempts = 5;
+
+    do
+    {
+        savedByteCount = saveFile(SPIFFS, MB_DEVICES_CONFIGURATION_BIN.c_str(),
+                                  (uint8_t *)liveObj.modbusDevices, sizeof(liveObj.modbusDevices));
+        if (attempts > 0 && savedByteCount != sizeof(liveObj.modbusDevices))
+        {
+            esp_task_wdt_reset(); // Enable panic on timeout
+            delay(10);
+        }
+        --attempts;
+    } while (attempts > 0 && savedByteCount != sizeof(liveObj.modbusDevices));
+
+    if (savedByteCount == sizeof(liveObj.modbusDevices))
+    {
+
+        success = true;
+        Serial.println("Device configuration saved " + (String)savedByteCount);
+    }
+    else
+    {
+        deleteFile(SPIFFS, MB_DEVICES_CONFIGURATION_BIN.c_str());
+        renameFile(SPIFFS, BKUP_MB_DEVICES_CONFIGURATION_BIN.c_str(), MB_DEVICES_CONFIGURATION_BIN.c_str());
+    }
+
+    load_modbus_devices();
+    return success;
+}
+
+ModbusDevice parseModbusJsonObject(JsonObject obj)
+{
+    ModbusDevice device;
+    memset(&device, 0, sizeof(device));
+    device.id = obj["id"];
+    device.address = obj["address"];
+    const char *name = obj["name"];
+    strcpy(device.name, name);
+    device.baud_rate = obj["baudrate"];
+    device.parity = obj["parity"];
+    device.regByteCount = obj["regByteCount"];
+    device.timeOut = obj["timeOut"];
+    device.registerDelay = obj["registerDelay"];
+    device.deviceDelay = obj["deviceDelay"];
+    device.syncPeriod = obj["syncPeriod"];
+    device.validityBytes = MB_VALIDITY_VALUE;
+    device.isActive = 1;
+    device.noOfRegisters = 0;
+
+    int noOfRegisters = 0;
+    for (JsonObject reg : obj["registers"].as<JsonArray>())
+    {
+        ApplicationRegister mbRegister;
+        mbRegister.id = reg["id"];
+        const char *name = reg["name"];
+        strcpy(mbRegister.name, name);
+        mbRegister.address = reg["address"];
+        mbRegister.reg_type = reg["regType"];
+        mbRegister.byte_order = reg["byteOrder"];
+        mbRegister.data_type = reg["dataType"];
+        mbRegister.factor = reg["factor"];
+        mbRegister.access_type = READ_WRITE_ACCESS;
+
+        // Serial.println(name + (String)" byte_order" + mbRegister.byte_order + (String)"  " );
+
+        device.mb_register[noOfRegisters] = mbRegister;
+        ++noOfRegisters;
+        if (noOfRegisters >= MAX_MB_REGISTER_COUNT)
+        {
+            break;
+        }
+    }
+    device.noOfRegisters = noOfRegisters;
+    return device;
+}
+
+void loadDefaultDevices()
+{
+    Serial.println("Loading Default configuration");
+    liveObj.deviceCount = 0;
+
+    // Create a DynamicJsonDocument with an estimated capacity
+    int length = sizeof(devicesJson) + 500;
+    JsonDocument deviceDoc; // You may adjust the size as needed
+
+    // Parse the JSON string
+    DeserializationError error = deserializeJson(deviceDoc, devicesJson.c_str());
+    if (error)
+    {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.f_str());
+        return;
+    }
+    // Access the array of objects
+    JsonArray array = deviceDoc.as<JsonArray>();
+    // Iterate through the array of objects
+    for (JsonObject obj : array)
+    {
+        liveObj.modbusDevices[liveObj.deviceCount] = parseModbusJsonObject(obj);
+        ++liveObj.deviceCount;
+        if (liveObj.deviceCount >= NO_OF_MODBUS_METERS && liveObj.deviceCount < DEFAULT_NUMBER_OF_MB_DEVICES)
+        {
+            break;
+        }
+    }
+    saveModbusDevicesConfiguration();
+}
+
+void initializeModbusDeviceInfo()
+{
+
+    Serial.println((String) "Load Modbus Devices " + (String)liveObj.deviceCount);
+    for (uint8_t ix = 0; ix < liveObj.deviceCount; ++ix)
+    {
+        liveObj.modbusDevices[ix].reset();
+        liveObj.modbusDevices[ix].printInfo();
+        for (uint8_t px = 0; px < liveObj.modbusDevices[ix].noOfRegisters; ++px)
+        {
+            // liveObj.modbusDevices[ix].mb_register[px].printInfo();
+            liveObj.modbusDevices[ix].mb_register[px].resetValue();
+        }
+    }
+}
+
+void printAllDevicesInfo()
+{
+
+    Serial.println((String) "Modbus Devices " + (String)liveObj.deviceCount);
+    for (uint8_t ix = 0; ix < liveObj.deviceCount; ++ix)
+    {
+        liveObj.modbusDevices[ix].printInfo();
+        for (uint8_t px = 0; px < liveObj.modbusDevices[ix].noOfRegisters; ++px)
+        {
+            liveObj.modbusDevices[ix].mb_register[px].printInfo();
+        }
+    }
+}
+
+void saveLogFile()
+{
+    Serial.println((String) "saveLogFile-> " + "wifiDisconnectionCounter:" + logObj.wifiDisconnectionCounter 
+    + ", mqttDisconnectionCounter 1:" + logObj.mqttDisconnectionCounter[0]
+    + ", mqttDisconnectionCounter 2:" + logObj.mqttDisconnectionCounter[1]
+     + ", switchOnCounter:" + logObj.switchOnCounter);
+    // saveFile(SPIFFS, LOG_CONFIGURATION_FILE.c_str(), (uint8_t *)&logObj, sizeof(logObj));
+    // delay(5);
+}
+
+void load_application_log()
+{
+    memset(&logObj, 0, sizeof(logObj));
+    // if (loadFile(SPIFFS, LOG_CONFIGURATION_FILE.c_str(), (uint8_t *)&logObj, sizeof(logObj)) <= 0)
+    // {
+    //     memset(&logObj, 0, sizeof(logObj));
+    //     saveLogFile();
+    // }
+}
+
+void load_modbus_devices()
+{
+    bool isDevicesLoaded = true;
+
+    liveObj.deviceCount = 0;
+    memset(liveObj.modbusDevices, 0, sizeof(liveObj.modbusDevices));
+    uint32_t devicesSize = sizeof(liveObj.modbusDevices);
+    Serial.println((String) "load_modbus_devices " + (String)devicesSize);
+#if (1)
+    if (SPIFFS.exists(MB_DEVICES_CONFIGURATION_BIN))
+    {
+        Serial.println((String) "Devices Configuration available");
+        File file = SPIFFS.open(MB_DEVICES_CONFIGURATION_BIN, "r");
+        if (!file)
+        {
+            Serial.println((String) "File not found ");
+            isDevicesLoaded = false;
+        }
+        else
+        {
+            if (file.available() == sizeof(liveObj.modbusDevices))
+            {
+                file.read((uint8_t *)liveObj.modbusDevices, devicesSize);
+            }
+            else
+            {
+                isDevicesLoaded = false;
+                Serial.println((String) "File MB_VALIDITY_VALUE " + file.size() + " " + sizeof(liveObj.modbusDevices));
+            }
+            file.close();
+        }
+    }
+    else
+    {
+        Serial.println("File not exists");
+        isDevicesLoaded = false;
+    }
+#else
+    isDevicesLoaded = false;
+#endif
+    if (isDevicesLoaded)
+    {
+        Serial.println("Devices Loaded");
+        liveObj.deviceCount = 0;
+        for (uint8_t ix = 0; ix < NO_OF_MODBUS_METERS; ++ix)
+        {
+            liveObj.modbusDevices[ix].isActive = liveObj.modbusDevices[ix].isActive &&
+                                                 liveObj.modbusDevices[ix].address > 0 && liveObj.modbusDevices[ix].baud_rate > 0;
+            if (liveObj.modbusDevices[ix].isActive)
+            {
+                ++liveObj.deviceCount;
+            }
+        }
+    }
+    else
+    {
+    }
+
+    // modbus.init(TX_MODE_OP, true);
+    // modbus.setTimeout(100);
+    liveObj.currentModbusDeviceIx = 0;
+    liveObj.currentRegisterIx = 0;
+    initializeModbusDeviceInfo();
+}
+
+uint8_t examplePacket[] =
+    {
+        0x00, 0x00, 0x40, 0x40,
+        0x00, 0x00, 0x00, 0x00,
+        0x5C, 0x29, 0x40, 0x3F,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00};
+
+void processModbusResponseBody(ModbusDevice *device, uint8_t *data,
+                               int startAddress, int endAddress, int32_t noOfRegisters)
+{
+    int rx = 0;
+    for (; rx < device->noOfRegisters; ++rx)
+    {
+        int registerCount = dataTypeByteCount((DATA_TYPE)device->mb_register[rx].data_type) / device->regByteCount;
+        if (device->mb_register[rx].address >= startAddress && (device->mb_register[rx].address + registerCount) <= endAddress)
+        {
+            int baseIx = (device->mb_register[rx].address - startAddress) * device->regByteCount;
+            device->mb_register[rx].SetValueFromBuffer(data, baseIx, registerCount * device->regByteCount);
+
+            // Serial.println((String) "Value: " + device->name + " -> " + device->mb_register[rx].name + ", value:" + device->mb_register[rx].getValue() + ", byte Order:" + device->mb_register[rx].byte_order);
+
+            // print_bytes_in_hex("Bytes", &data.data()[baseIx], registerCount * device->regByteCount);
+            // print_bytes_in_hex("value Bytes", (uint8_t*)&device->mb_register[rx].value, registerCount * device->regByteCount);
+        }
+    }
+}
+
+CommandStatus processRegisterCommandReading(ModbusDevice *device, uint8_t functionCode, int32_t startAddress, int32_t noOfRegisters,
+                                            uint8_t crc_require, uint8_t tcp_header_require, uint16_t modbusTransactionId)
+{
+
+    // + " " + (String)regType);
+    CommunicationResponse response = ProcessRegisterOrCoilReading(device, device->address, device->regByteCount, functionCode, startAddress, noOfRegisters,
+                                                                  crc_require, tcp_header_require,
+                                                                  modbusTransactionId);
+    CommandStatus status = COMMAND_COMMUNICATION_ERROR;
+    //(void)*command;
+
+    // Serial.println((String)"response.result " + response.result + " " + response.data.size());
+    if (response.result == true && response.byteCount == (noOfRegisters * device->regByteCount))
+    {
+        int rx = 0;
+        int endAddress = startAddress + noOfRegisters;
+        processModbusResponseBody(device, response.bytes, startAddress, endAddress, noOfRegisters);
+
+        status = COMMAND_OK;
+    }
+
+    return status;
+}
+
+CommandStatus processCoilCommandReading(ModbusDevice *device, uint8_t functionCode, int32_t startAddress, int32_t noOfRegisters,
+                                        uint8_t crc_require, uint8_t tcp_header_require, uint16_t modbusTransactionId)
+{
+    CommunicationResponse response = ProcessRegisterOrCoilReading(device, device->address, device->regByteCount, functionCode, startAddress, noOfRegisters,
+                                                                  crc_require, tcp_header_require, modbusTransactionId);
+    CommandStatus status = COMMAND_COMMUNICATION_ERROR;
+
+    // Serial.println((String)"processCoilCommandReading");
+    if (response.result == true && response.byteCount == noOfRegisters)
+    {
+        int32_t rx = 0;
+        int32_t end_address = startAddress + noOfRegisters;
+        uint8_t *data = response.bytes;
+        for (; rx < device->noOfRegisters; ++rx)
+        {
+            if (device->mb_register[rx].address >= startAddress && device->mb_register[rx].address < end_address)
+            {
+                int32_t baseIx = device->mb_register[rx].address - startAddress;
+                device->mb_register[rx].setDeviceValue((String)data[baseIx]);
+
+                // Serial.println((String) "Value: " + device->name + " -> " + device->mb_register[rx].name + " " + device->mb_register[rx].getValue());
+            }
+        }
+        status = COMMAND_OK;
+    }
+    return status;
+}
+
+void configureSerialPort(uint32_t baud_rate, uint8_t parity)
+{
+    if (parity == NONE_PARITY)
+    {
+        Serial1.begin(baud_rate, SERIAL_8N1, RXPIN, TXPIN);
+    }
+    else if (parity == EVEN_PARITY)
+    {
+        Serial1.begin(baud_rate, SERIAL_8E1, RXPIN, TXPIN);
+    }
+    else if (parity == ODD_PARITY)
+    {
+        Serial1.begin(baud_rate, SERIAL_8O1, RXPIN, TXPIN);
+    }
+}
+
+void process_modbus_requests()
+{
+    // if (liveObj.isSaveDeviceCOnfiguration)
+    // {
+    //     liveObj.isSaveDeviceCOnfiguration = false;
+    //     saveModbusDevicesConfigurationToFileSystem();
+    // }
+
+    if (xSemaphoreTake(deviceMutex, portMAX_DELAY) == pdTRUE)
+    {
+        if (liveObj.deviceCount > 0 && liveObj.currentModbusDeviceIx < NO_OF_MODBUS_METERS)
+        {
+            uint8_t dx = liveObj.currentModbusDeviceIx;
+            ModbusDevice *deviceObj = &liveObj.modbusDevices[dx];
+            CommandStatus status = COMMAND_OK;
+
+            if (deviceObj->address == 0xff)
+            {
+                for (uint32_t rx = 0; rx < deviceObj->noOfRegisters; ++rx)
+                {
+                    ApplicationRegister *mbRegister = &deviceObj->mb_register[rx];
+                    if (mbRegister->reg_type == READ_HOLDING_ADDRESS)
+                    {
+                        uint8_t registerAddress = mbRegister->address / 2;
+
+                        uint16_t readings[4] = {0}, ix = 0;
+                        readings[ix++] = liveObj.do_1_mode;
+                        readings[ix++] = liveObj.do_1_manual;
+                        readings[ix++] = liveObj.do_1_persistance_off;
+                        readings[ix++] = liveObj.do_1_persistance_on;
+
+                        if (registerAddress < ix)
+                        {
+                            mbRegister->value.u16_value = readings[registerAddress];
+                        }
+                    }
+                    else if (mbRegister->reg_type == READ_INPUT_ADDRESS)
+                    {
+
+                        float readings[5] = {0};
+                        uint8_t ix = 0;
+                        uint8_t registerAddress = mbRegister->address / 4;
+
+                        readings[ix++] = liveObj.ai_1_adc;
+                        readings[ix++] = liveObj.ai_2_adc;
+                        readings[ix++] = liveObj.ai_1_value;
+                        readings[ix++] = liveObj.ai_2_value;
+                        readings[ix++] = liveObj.do_1_value;
+                        if (registerAddress < ix)
+                        {
+                            mbRegister->value.f_value = readings[registerAddress];
+                        }
+                    }
+                }
+                liveObj.currentRegisterIx = deviceObj->noOfRegisters - 1;
+            }
+            else if (liveObj.currentRegisterIx < deviceObj->noOfRegisters)
+            {
+                if (liveObj.currentRegisterIx == 0)
+                {
+                    configureSerialPort(deviceObj->baud_rate, deviceObj->parity);
+                    application_delay(deviceObj->deviceDelay);
+                    // deviceObj->printInfo();
+                }
+
+                ApplicationRegister *mbRegisters = deviceObj->mb_register;
+
+                int32_t startAddress = -1;
+                int32_t prevAddres = 0;
+                int32_t nextAddress = -1;
+                int16_t noOfRegisters = 0;
+                uint8_t regType = 0;
+
+                for (uint32_t rx = liveObj.currentRegisterIx; rx < deviceObj->noOfRegisters && (status == COMMAND_OK); ++rx)
+                {
+                    if (((regType == mbRegisters[rx].reg_type) && (prevAddres == mbRegisters[rx].address) && (noOfRegisters > 0)) || (mbRegisters[rx].access_type == WRITE_ACCESS))
+                    {
+                        // continue to next
+                    }
+                    else if ((regType == mbRegisters[rx].reg_type) && (mbRegisters[rx].address == nextAddress) && (noOfRegisters > 0))
+                    {
+                        prevAddres = nextAddress;
+                        if (mbRegisters[rx].reg_type == READ_COILS_ADDRESS || mbRegisters[rx].reg_type == READ_DISCRETE_IP_ADDRESS)
+                        {
+                            noOfRegisters += 1;
+                            nextAddress = nextAddress + 1;
+                        }
+                        else
+                        {
+                            noOfRegisters += mbRegisters[rx].getByteCount(deviceObj->regByteCount);
+                            nextAddress = nextAddress + mbRegisters[rx].getByteCount(deviceObj->regByteCount);
+                        }
+                    }
+                    else
+                    {
+                        if (noOfRegisters > 0)
+                        {
+                            if (status == COMMAND_OK)
+                            {
+                                application_delay(deviceObj->registerDelay);
+                            }
+                            if (regType == READ_COILS_ADDRESS || regType == READ_DISCRETE_IP_ADDRESS)
+                            {
+                                status = processCoilCommandReading(deviceObj, regType, startAddress, noOfRegisters, 1, 0, 0);
+                            }
+                            else
+                            {
+                                status = processRegisterCommandReading(deviceObj, regType, startAddress, noOfRegisters, 1, 0, 0);
+                            }
+                        }
+
+                        startAddress = mbRegisters[rx].address;
+                        prevAddres = startAddress;
+                        regType = mbRegisters[rx].reg_type;
+                        if (regType == READ_COILS_ADDRESS || regType == READ_DISCRETE_IP_ADDRESS)
+                        {
+                            noOfRegisters = 1;
+                        }
+                        else
+                        {
+                            noOfRegisters = mbRegisters[rx].getByteCount(deviceObj->regByteCount);
+                        }
+                        nextAddress = startAddress + noOfRegisters;
+                        // Serial.println((String)"noOfRegisters 1: "
+                    }
+                }
+
+                // Serial.println((String)"noOfRegisters 2: "
+                // + (String)startAddress + " " + (String)nextAddress + " " + (String)noOfRegisters);
+                if (noOfRegisters > 0 && (status == COMMAND_OK))
+                {
+                    application_delay(deviceObj->registerDelay);
+                    if (regType == READ_COILS_ADDRESS || regType == READ_DISCRETE_IP_ADDRESS)
+                    {
+                        status = processCoilCommandReading(deviceObj, regType, startAddress, noOfRegisters, 1, 0, 0);
+                    }
+                    else if (regType == READ_HOLDING_ADDRESS || regType == READ_INPUT_ADDRESS)
+                    {
+                        status = processRegisterCommandReading(deviceObj, regType, startAddress, noOfRegisters, 1, 0, 0);
+                    }
+                }
+
+                if (noOfRegisters > 0)
+                {
+                    liveObj.currentRegisterIx += noOfRegisters - 1;
+                }
+            }
+            liveObj.currentRegisterIx = (liveObj.currentRegisterIx + 1);
+            if (liveObj.currentRegisterIx >= deviceObj->noOfRegisters || (status != COMMAND_OK))
+            {
+                deviceObj->lastFetchTime = millis();
+                deviceObj->isSynced = deviceObj->isSynced || status == COMMAND_OK;
+                deviceObj->connected = status == COMMAND_OK;
+                // deviceObj->isSynced = true;
+                liveObj.currentModbusDeviceIx = (liveObj.currentModbusDeviceIx + 1) % liveObj.deviceCount;
+                liveObj.currentRegisterIx = 0;
+            }
+
+            if (get_abs_diffrence(millis(), deviceObj->lastSyncTime) >= deviceObj->syncPeriod)
+            {
+                deviceObj->lastSyncTime = millis();
+                if (deviceObj->isSynced)
+                {
+                    String deviceData = getDeviceRealtimeJson(deviceObj->id, true);
+                    publishMessage(deviceObj->id, "", (const char *)deviceData.c_str(), deviceData.length());
+                    deviceObj->isSynced = false;
+                    deviceObj->communicationLastCounter = 0;
+                }
+                else
+                {
+                    if (deviceObj->communicationLastCounter == 0)
+                    {
+                        ++liveObj.slaveConnectionCounter[dx];
+                        Serial.println((String) "Disconnection RS485-> " + deviceObj->name);
+                    }
+                    deviceObj->communicationLastCounter++;
+                }
+                if (dx == 0)
+                {
+
+                    JsonDocument jsonDoc;
+                    if (WiFi.isConnected())
+                    {
+                        jsonDoc["gatewayLocalIp"] = WiFi.localIP();
+                    }
+                    jsonDoc["gatewayOnTime"] = (uint32_t)(millis() / 60000);
+                    jsonDoc["switchOnCounter"] = logObj.switchOnCounter;
+                    jsonDoc["wifiDisconnectionCounter"] = logObj.wifiDisconnectionCounter;                    
+                    jsonDoc["mqttDisconnectionCounter"] = logObj.mqttDisconnectionCounter[0];                 
+                    jsonDoc["mqttDisconnectionCounter_2"] = logObj.mqttDisconnectionCounter[1];
+
+                    String jsonResponse;
+                    serializeJson(jsonDoc, jsonResponse);
+                    publishGatewayMessage("/connection", (const char *)jsonResponse.c_str(), jsonResponse.length());
+                }
+
+                {
+                    JsonDocument jsonDoc;
+                    jsonDoc["disconnectionTime"] = (uint32_t)((deviceObj->communicationLastCounter * deviceObj->syncPeriod) / 60000);
+                    jsonDoc["disconnectionCounter"] = liveObj.slaveConnectionCounter[dx];
+
+                    String jsonResponse;
+                    serializeJson(jsonDoc, jsonResponse);
+
+                    publishMessage(deviceObj->id, "/connection", (const char *)jsonResponse.c_str(), jsonResponse.length());
+                }
+            }
+        }
+        else
+        {
+            liveObj.currentModbusDeviceIx = 0;
+        }
+        xSemaphoreGive(deviceMutex); // Release the mute
+    }
+}

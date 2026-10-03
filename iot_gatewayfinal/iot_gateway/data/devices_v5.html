@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modbus Devices</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.min.css " rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/grids-responsive-min.css" />
+
+    <link rel="stylesheet" href="assets/pure-min.css" />
+    <link rel="stylesheet" href="assets/pure_grids_min.css" />
+    <link rel="stylesheet" href="assets/style.css" />
+    <link rel="stylesheet" href="assets/pages.css" />
+    <!-- <link rel="stylesheet" href="fonts/fontawesome.min.css" /> -->
+  </head>
+
+  <body x-data="applicationState()"> 
+    <div class="pure-g"  style="margin: 20px">
+      <!-- Tab Buttons -->
+      <div class="pure-menu pure-menu-horizontal" style="margin-bottom: 10px; ">
+        <ul class="pure-menu-list">
+          <li class="pure-menu-item">
+            <button
+              class=" pure-button" 
+              :class="{ 'pure-button-primary': activeTab === 1 }"
+              @click="activeTab = 1; reload()"
+              :style="{ fontWeight: activeTab === 1 ? 'normal' : 'bold' }" 
+            >
+              Mode Configuration
+            </button>
+          </li>
+          <li class="pure-menu-item">
+            <button
+              class="pure-button"
+              :class="{'pure-button-primary': activeTab === 2 }"
+              @click="activeTab = 2"
+              :style="{ fontWeight: activeTab === 2 ? 'normal' : 'bold',  }" 
+            >
+              IO Configuration
+            </button>
+          </li>
+          <li class="pure-menu-item" x-show="gatewayMode == 0">
+            <button
+              class="pure-button"
+              :class="{ 'pure-button-primary': activeTab === 3 }"
+              :style="{ fontWeight: activeTab === 3 ? 'normal' : 'bold' }" 
+              @click="activeTab = 3; fetchDevices('modbus')"
+            >
+              Modbus Configuration
+            </button>
+          </li>
+          <li class="pure-menu-item" >
+            <button
+              class="pure-button"
+              :class="{ 'pure-button-primary': activeTab === 4 }"
+              :style="{ fontWeight: activeTab === 4 ? 'normal' : 'bold' }" 
+              @click="activeTab = 4; fetchDevices('snmp')"
+            >
+              Snmp Configuration
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tab Content -->
+       <div class="pure-u-1" style=" border: 1px solid #ddd; padding: 5px;">
+            <div class="pure-u-1"  x-show="activeTab === 1">   
+                <form  @submit.prevent="saveConfiguration" class="pure-form pure-form-stacked" > 
+                    <fieldset> 
+                        <div class="pure-g">
+                            <div class="pure-u-1-2 pure-u-md-1-5">
+                                <label for="gatewayMode"  >Gateway Mode</label>
+                                <select
+                                    id="gatewayMode"
+                                    x-model="gatewayMode" 
+                                    class="pure-u-18-24 pure-u-md-23-24"
+                                >
+                                    <template x-for="(mode, index) in modes">
+                                    <option x-model="index">
+                                        <span x-text="mode"></span>
+                                    </option>
+                                    </template>
+                                </select>
+                            </div>
+                            
+                            <div class="pure-u-1-2 pure-u-md-1-5" x-show="gatewayMode == 1">
+                                <label for="port"   >Gateway Port</label >
+                                <input
+                                    id="port"
+                                    type="number"
+                                    placeholder="port"
+                                    x-model="port" 
+                                    required
+                                    class="pure-u-18-24 pure-u-md-23-24"
+                                />
+                            </div>
+                            
+                            <div class="pure-u-1-2 pure-u-md-1-5" x-show="gatewayMode == 1">
+                                <label for="baudrate"  >Baudrate</label >
+                                <input
+                                    id="baudrate"
+                                    type="number"
+                                    placeholder="Baudrate"
+                                    x-model="baudrate" 
+                                    required
+                                    class="pure-u-18-24 pure-u-md-23-24"
+                                />
+                            </div>
+                            
+                            <div class="pure-u-1-2 pure-u-md-1-5" x-show="gatewayMode == 1">
+                                <label for="parity" >Parity</label>
+                                <select id="parity" x-model="parity"   class="pure-u-18-24 pure-u-md-23-24">
+                                    <template x-for="(parityX, index) in parityType">
+                                    <option x-model="index">
+                                        <span x-text="parityX"></span>
+                                    </option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+        
+                    </fieldset>                
+                    <button type="submit" class="pure-button button-success">Save Configuration</button> 
+                </form>
+
+                <div x-show="errorMsg" class="error-msg">
+                Please fill in all required fields correctly.
+                </div>
+            </div> 
+
+            <div  class="pure-u-1" x-show="activeTab === 2"  > 
+                <form  @submit.prevent="saveFormulas" class="pure-form pure-form-stacked">
+                    <fieldset> 
+                        <legend style="font-weight: bold; font-size: 1rem;">Analog 1 Configuration</legend> 
+                        <div class="pure-u-1"   >
+                          <label   class="pure-u-1" style="padding-top: 10px;">Analog Formula text </label>
+                          <br>
+                          <input  class="pure-u-4-5 " type="text" style="display: inline" x-model="ai_1_formula" />
+                          <!-- <span x-text="ai_1_formula"></span> -->
+                       </div>
+                        
+                        <legend style="font-weight: bold; font-size: 1rem; padding-top: 40px;">Analog 2 Configuration</legend>
+                        <div class="pure-u-1" >
+                          <label   class="pure-u-1" style="padding-top: 10px;">Analog Formula text </label>
+                          <br>
+                          <input   class="pure-u-4-5 " type="text" style="display: inline" x-model="ai_2_formula" />
+                          <!-- <span x-text="ai_2_formula"></span> -->
+                       </div>
+                        
+                        <legend style="font-weight: bold; font-size: 1rem; padding-top: 40px;">Relay Configuration</legend> 
+                       
+                        <div class="pure-u-1 pure-u-md-2-5" > 
+                            <label for="do_1_mode"  >Relay Mode</label>
+                            <select
+                                id="do_1_mode"
+                                x-model="do_1_mode" 
+                                class="pure-u-1-2 pure-u-md-2-5"
+                            >
+                                <template x-for="(mode, index) in relayModes">
+                                <option x-model="index">
+                                    <span x-text="mode"></span>
+                                </option>
+                                </template>
+                            </select>
+                            <select
+                                id="do_1_manual"
+                                x-model="do_1_manual" 
+                                class="pure-u-1-2 pure-u-md-2-5"
+                                x-show="do_1_mode"
+                            >
+                                <template x-for="(mode, index) in relayStatus">
+                                <option x-model="index">
+                                    <span x-text="mode"></span>
+                                </option>
+                                </template>
+                            </select> 
+                      </div>
+                      <div class="pure-u-1" x-show="do_1_mode==0">
+                        <label   class="pure-u-1" style="padding-top: 10px;">Relay Formula text </label>
+                        <br>
+                        <input   class="pure-u-4-5 " type="text" style="display: inline" x-model="do_1_formula" />
+                    </div>   
+
+                    
+                    <div class="pure-u-1" x-show="do_1_mode==0">
+                      <label   class="pure-u-1" style="padding-top: 10px;">Relay Persistance off time (0 to 60000)</label>
+                      <br>
+                      <input   class="pure-u-1-2 " type="number" style="display: inline" x-model="do_1_persistance_off" />
+                  </div>
+                  
+                  <div class="pure-u-1" x-show="do_1_mode==0">
+                    <label   class="pure-u-1" style="padding-top: 10px;">Relay Persistance on time (0 to 60000)</label>
+                    <br>
+                    <input   class="pure-u-1-2 " type="number" style="display: inline" x-model="do_1_persistance_on" />
+                </div>
+                    
+                        <button type="submit" class="pure-button button-success" style="margin-top: 50px;">Save Configuration</button>
+                    </fieldset>
+                </form>
+            </div>
+
+
+            <div x-show="activeTab === 3" class="pure-g">
+                <div class="pure-u-1" style="padding: 10px;">           
+                    <div x-show="gatewayMode == 0" style="max-width: 100%;width: fit-content" class="scrollable-container">
+                        <table class="pure-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Device ID</th>
+                                    <th>Name</th>
+                                    <th>Address</th>
+                                    <th>Baudrate</th>
+                                    <th>Parity</th>
+                                    <th>Register Size</th>
+                                    <th>Time out</th>
+                                    <th>Device Inter Gap</th>
+                                    <th>Register Inter Gap</th>
+                                    <th>Server Sync Period</th>
+                                    <th>Read</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(device, index) in devices">
+                                    <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                                        <td><span x-text="index + 1"></span></span> </td>
+                                        <td><span x-text="device.id"></span></span></td>
+                                        <td><span x-text="device.name"></span></span></td>
+                                        <td><span x-text="device.address"></span></span></td>
+                                        <td><span x-text="device.baudrate"></span> </td>
+                                        <td><span x-text="parityType[device.parity]"></span> </td>
+                                        <td><span x-text="device.regByteCount"></span> </td>
+                                        <td><span x-text="device.timeOut"></span> </td>
+                                        <td><span x-text="device.deviceDelay"></span> </td>
+                                        <td><span x-text="device.registerDelay"></span> </td>
+                                        <td><span x-text="device.syncPeriod"></span> </td>
+                                        <td><span x-text="device.blockRead?'Block':'Individual'"></span> </td>
+                                        <td>
+                                            <!-- Action buttons -->
+                                            <button @click="viewDevice(device, 'modbus')" title="View" class="action-btn">
+                                              <object data="fonts/eye.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+                                            </button>
+                                            <button @click="deleteDevice(device, 'modbus')" title="Edit" class="action-btn">                                              
+                                              <object data="assets/trash.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                
+                            </tbody>
+                        </table>
+                    </div>
+            
+                    <div  x-show="gatewayMode == 0"  class="modal-container">
+                        <div class="flex-container" style="align-items: center;">
+                            <h2>Add Modbus Device JSON</h2>
+                            <button  class="flex-item pure-button button-success" style="max-width: 100px; padding: 5px;"
+                                @click="addDevice('modbus')">Add Device</button>
+                        </div>
+                        <textarea x-model="deviceModbusJson" rows="20" cols="100" placeholder="add device json text here"></textarea>
+                    </div>
+            
+                    <!-- Modal Dialog -->
+                    <div x-show="isModalOpen && activeTab == 3 && currentDevice != undefined && registers" class="modal" style="display: none;"
+                        @click="closeModal()" x-transition>
+                        <div class="modal-container" @click.stop>
+                            <h2 x-text="currentDevice?.name"> </h2>
+            
+                            <div style="max-width: 100%;width: fit-content" class="scrollable-container">
+                                <table class="pure-table">
+                                    <thead>
+                                        <th>#</th>
+                                        <th>Parameter ID</th>
+                                        <th>Name</th>
+                                        <th>Value</th>
+                                        <th>Modbus Address</th>
+                                        <th>Register Type</th>
+                                        <th>Data Type</th>
+                                        <th>Byte order</th>
+                                        <th>factor</th>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(register, index) in registers">
+                                            <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                                                <td><span x-text="index + 1"></span></span> </td>
+                                                <td><span x-text="register.id"></span></span></td>
+                                                <td><span x-text="register.name"></span></span></td>
+                                                <td><span x-text="register.value"></span></span></td>
+                                                <td><span x-text="register.address"></span> </td>
+                                                <td><span x-text="modbusRegister[register.regType - 1]"></span> </td>
+                                                <td><span x-text="dataType[register.dataType]"></span> </td>
+                                                <td><span x-text="byteOrder[register.byteOrder]"></span> </td>
+                                                <td><span x-text="register.factor"></span> </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div> 
+
+            
+            <div x-show="activeTab === 4" class="pure-g">
+              <div class="pure-u-1" style="padding: 10px;">           
+                  <div style="max-width: 100%;width: fit-content" class="scrollable-container">
+                      <table class="pure-table">
+                          <thead>
+                              <tr>
+                                  <th>#</th>
+                                  <th>Device ID</th>
+                                  <th>Name</th>
+                                  <th>Address</th>
+                                  <th>Port</th>
+                                  <th>Read Community</th>
+                                  <th>Write Community</th>
+                                  <th>Version</th> 
+                                  <th>Device Delay</th> 
+                                  <th>Sync Period</th> 
+                                  <th>Actions</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <template x-for="(device, index) in devices">
+                                  <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                                      <td><span x-text="index + 1"></span></span> </td>
+                                      <td><span x-text="device.id"></span></span></td>
+                                      <td><span x-text="device.name"></span></span></td>
+                                      <td><span x-text="device.address"></span></span></td>
+                                      <td><span x-text="device.port"></span> </td> 
+                                      <td><span x-text="device.readCommunity"></span> </td>
+                                      <td><span x-text="device.writeCommunity"></span> </td>
+                                      <td><span x-text="device.snmpVersion"></span> </td>
+                                      <td><span x-text="device.deviceDelay"></span> </td>
+                                      <td><span x-text="device.syncPeriod"></span> </td>
+                                      <td>
+                                          <!-- Action buttons -->
+                                          <button @click="viewDevice(device, 'snmp')" 
+                                          style="background-image: url('/fonts/eye.svg');" title="View" class="action-btn">
+                                            <object data="fonts/eye.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+                                          </button>
+                                          <button @click="deleteDevice(device, 'snmp')" 
+                                          style="background-image: url('/assets/trash.svg');"  title="Edit" class="action-btn">                                              
+                                            <object data="assets/trash.svg" type="image/svg+xml" width="15" height="15"  style="pointer-events: none;"></object>
+                                          </button>
+                                      </td>
+                                  </tr>
+                              </template>
+                          </tbody>
+                      </table>
+                  </div>
+          
+                  <div  x-show="gatewayMode == 0"  class="modal-container">
+                      <div class="flex-container" style="align-items: center;">
+                          <h2>Add Snmp Device JSON</h2>
+                          <button  class="flex-item pure-button button-success" style="max-width: 100px; padding: 5px;"
+                              @click="addDevice('snmp')">Add Device</button>
+                      </div>
+                      <textarea x-model="deviceSnmpJson" rows="20" cols="100" placeholder="add device json text here"></textarea>
+                  </div>
+          
+                  <!-- Modal Dialog -->
+                  <div x-show="isModalOpen && activeTab == 4 && currentDevice != undefined && registers" class="modal" style="display: none;"
+                      @click="closeModal()" x-transition>
+                      <div class="modal-container" @click.stop>
+                          <h2 x-text="currentDevice?.name"> </h2>
+          
+                          <div style="max-width: 100%;width: fit-content" class="scrollable-container">
+                              <table class="pure-table">
+                                  <thead>
+                                      <th>#</th>
+                                      <th>ID</th>
+                                      <th>Name</th>
+                                      <th>Value</th>
+                                      <th>Oid</th> 
+                                      <th>Data Type</th> 
+                                      <th>factor</th>
+                                  </thead>
+                                  <tbody>
+                                      <template x-for="(register, index) in registers">
+                                          <tr :class="index % 2 == 0 ? 'pure-table-odd' : ''">
+                                              <td><span x-text="index + 1"></span></span> </td>
+                                              <td><span x-text="register.id"></span></span></td>
+                                              <td><span x-text="register.name"></span></span></td>
+                                              <td><span x-text="register.value"></span></span></td>
+                                              <td><span x-text="register.oid"></span> </td> 
+                                              <td><span x-text="dataType[register.dataType]"></span> </td> 
+                                              <td><span x-text="register.factor"></span> </td>
+                                          </tr>
+                                      </template>
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div> 
+
+        </div>
+    </div>
+  </body>
+
+  <script>
+    function applicationState() {
+      return {
+        activeTab: 2,
+        modes: ["Modbus Master", "Transparent"],
+        gatewayMode: 0,
+        baudrate: 9600,
+        parity: 0,
+        port: 8080,
+
+        analogMode: ["Range", "Formula"],  
+
+        relayModes: ["Auto", "Manual"],
+        relayStatus: ["Relay Off", "Relay On"],
+        relayAutoInput: ["Analog 1", "Analog 2"],
+        operation:['Greater-than >', 
+        'Grater-than or Equal>=', 
+        'Equal ==', 
+        'Less-than <=', 
+        'Less-than or Equal <',
+        'Inner <>', 
+        'Outer ><'],
+        ai_1_formula: '',
+        ai_2_formula: '', 
+        do_1_formula: '', 
+        do_1_mode: 0,
+        do_1_manual: 0,
+        do_1_persistance_off: 0,
+        do_1_persistance_on: 0,
+
+        di_live: 0,
+
+        parityType: ["None", "Even", "Odd"],
+        byteOrder: ["Little", "Big", "Mid BIg", "Mid Little"],
+        modbusRegister: [
+          "IP Discret",
+          "Coil Discrete",
+          "Holding Register",
+          "Read input",
+        ],
+        dataType: [
+          "No Type",
+          "Bit Type",
+          "INT8",
+          "UINT8",
+          "INT16",
+          "UINT16",
+          "INT32",
+          "UINT32",
+          "INT64",
+          "UINT64",
+          "Float",
+          "Double",
+        ],
+        isModalOpen: false,
+        deviceModbusJson: "",
+        deviceSnmpJson: "",
+        currentDevice: null,
+        currentDeviceType: null,
+        isRunning: false,
+        intervalId: null,
+        errorMsg: false,
+        devices: [],
+        registers: [],
+
+        startInterval() {
+          this.isRunning = true;
+          this.intervalId = setInterval(() => {
+            this.fetchDeviceRegistersInfo();
+          }, 3000); // Update every second
+        },
+        stopInterval() {
+          this.isRunning = false;
+          try {
+            clearInterval(this.intervalId);
+          } catch (err) {}
+        },
+        viewDevice(device, type) {
+          this.stopInterval();
+          this.currentDeviceType = type;
+          this.currentDevice = device;
+          this.isModalOpen = this.currentDevice != undefined;
+          this.fetchDeviceRegistersInfo();
+          this.startInterval();
+        },
+        deleteDevice(device, deviceType) {
+          const userConfirmed = confirm("Are you sure you want to continue?");
+
+          if (userConfirmed) {
+            this.deleteDeviceRequest(device, deviceType);
+          }
+        },
+        saveData() {
+          console.log("Network data saved:", data);
+          alert("Network settings saved successfully!");
+        },
+        closeModal() {
+          this.isModalOpen = false;
+          this.stopInterval();
+          this.currentDevice = null;
+        },
+        fetchDevices(deviceType) {
+          fetch(`/${deviceType}_devices`)
+            .then((response) => response.json())
+            .then((devices) => {
+              this.devices = devices;
+            })
+            .catch((error) => console.error("Error:", error));
+        },
+        fetchDeviceRegistersInfo() {
+          console.log("this.currentDevice", this.currentDeviceType, this.currentDevice);
+          if (this.currentDevice) {
+            fetch(`/${this.currentDeviceType}_registers?id=${this.currentDevice.id}`)
+              .then((response) => response.json())
+              .then((registers) => {
+                this.registers = registers;
+              })
+              .catch((error) => console.error("Error:", error));
+          }
+        },
+        deleteDeviceRequest(device, deviceType) {
+          fetch(`/delete_${deviceType}_device?id=${device.id}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded", //"application/json",
+            },
+            //body: JSON.stringify({ value: "456" }),
+          })
+            .then((response) => response.json())
+            .then((statusObj) => {
+              console.log("devices", statusObj);
+              alert(statusObj.message);
+              this.fetchDevices(deviceType);
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+              alert("Error:" + error.message);
+            });
+        },
+        addDevice(deviceType) {
+          try {
+            let deviceObj;
+            if(deviceType == 'snmp'){
+              deviceObj = JSON.parse(this.deviceSnmpJson);
+            }else{
+              deviceObj = JSON.parse(this.deviceModbusJson);
+            }
+            console.log("this.deviceJson", deviceObj);
+            fetch(`/add_${deviceType}_device`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded", //"application/json",
+              },
+              body: JSON.stringify(deviceObj),
+            })
+              .then((response) => response.json())
+              .then((statusObj) => {
+                console.log("devices", statusObj);
+                alert(statusObj.message);
+                this.fetchDevices(deviceType);
+              })
+              .catch((error) => {
+                console.error("Error:", error);
+                alert("Error:" + error.message);
+              });
+          } catch (err) {
+            alert("Error: " + err.message);
+          }
+        },
+        loadConfiguration() {
+          fetch("/configuration")
+            .then((response) => response.json())
+            .then((data) => {
+              this.gatewayMode = data.gatewayMode;
+              this.baudrate = data.baudrate;
+              this.parity = data.parity;
+              this.port = data.port;
+            })
+            .catch((error) => console.error("Error:" + error.message));
+        },
+        saveConfiguration() {
+          if (
+            this.gatewayMode == undefined ||
+            !this.baudrate ||
+            !this.port ||
+            this.parity == undefined
+          ) {
+            console.log(
+              "saveConfiguration",
+              this.gatewayMode == undefined,
+              !this.baudrate,
+              !this.port,
+              this.parity == undefined
+            );
+            this.errorMsg = true;
+            return;
+          }
+          this.errorMsg = false;
+          const data = {
+            gatewayMode: this.gatewayMode,
+            baudrate: this.baudrate,
+            port: this.port,
+            parity: this.parity,
+          };
+
+          console.log("Configuration data saved:", data);
+
+          fetch("/configuration", {
+            method: "POST", // HTTP method
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: JSON.stringify(data), // Send data as URL-encoded
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              return response.json(); // Parse JSON response
+            })
+            .then((data) => {
+              alert("Configuration saved successfully!");
+              this.loadConfiguration();
+            })
+            .catch((error) => {
+              alert("Configuration failed to save!");
+              console.error("Error:", error); // Handle errors
+            });
+        },
+        saveFormulas(){ 
+          const data = {
+            ai_1_formula: this.ai_1_formula,
+            ai_2_formula: this.ai_2_formula,
+            do_1_formula: this.do_1_formula,
+            do_1_mode: this.do_1_mode,
+            do_1_manual: this.do_1_manual,
+            do_1_persistance_off: this.do_1_persistance_off,
+            do_1_persistance_on: this.do_1_persistance_on
+          };
+
+          console.log("Configuration data saving:", data); 
+
+          fetch("/save_formulas", {
+            method: "POST", // HTTP method
+            headers: {
+              "Content-Type": "application/json", //"application/x-www-form-urlencoded",
+            },
+            body: JSON.stringify(data), // Send data as URL-encoded
+          })
+            .then((response) => {
+              console.log('response', response);
+              if (!response.ok) { 
+                //throw new Error(`HTTP error! status: ${response.status}`);
+                return response.body().then((errorBody) => {
+                  throw new Error(`HTTP error! status: ${response.status} - ${errorBody}`);
+                });
+              }
+              return response.json(); // Parse JSON response
+            })
+            .then((data) => {
+              alert("Configuration saved successfully!");
+              this.loadFormulas();
+            })
+            .catch((error) => {
+              console.error("Error:", error); // Handle errors
+              alert("Configuration failed to save!");
+            });
+        },
+        loadFormulas(){
+          fetch("/loadFormulas")
+          .then((response) => response.json())
+          .then((data) => {
+            this.ai_1_formula = data.ai_1_formula;
+            this.ai_2_formula = data.ai_2_formula;
+            this.do_1_formula = data.do_1_formula;
+            this.do_1_manual = data.do_1_manual;
+            this.do_1_mode = data.do_1_mode;
+            
+            this.do_1_persistance_off = data.do_1_persistance_off;
+            this.do_1_persistance_on = data.do_1_persistance_on;
+            
+            this.AI_1_HW = data.AI_1_HW;
+            this.AI_2_HW = data.AI_2_HW;
+
+            this.AI_1_VALUE = data.AI_1_VALUE;
+            this.AI_2_VALUE = data.AI_2_VALUE;
+            this.do_1_value = data.do_1_value;
+
+          })
+          .catch((error) => console.error("Error:" + error.message));
+        },
+        reload() {
+          this.loadConfiguration();
+          this.loadFormulas();
+        },
+        init() {
+          this.reload();
+        },
+      };
+    }
+  </script>
+  <script src="assets/alpine.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</html>
